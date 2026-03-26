@@ -1,0 +1,287 @@
+"""Seed script to populate the database with demo evaluation data."""
+
+import asyncio
+import json
+import random
+from datetime import datetime, timedelta
+
+from db.database import engine, async_session, Base
+from models.evaluation import Evaluation
+
+
+DEMO_DATA = [
+    {
+        "prompt": "What is the capital of France?",
+        "response": "The capital of France is Paris. It is the largest city in France and serves as the country's political, economic, and cultural center.",
+        "accuracy": "correct",
+        "issues": [],
+        "confidence": 0.95,
+        "severity": "low",
+        "llm_score": 0.95,
+        "rule_score": 1.0,
+        "final_score": 0.97,
+        "latency_ms": 1250,
+    },
+    {
+        "prompt": "Who invented the internet?",
+        "response": "The internet was invented by Albert Einstein in 1972 at MIT, according to various studies showing approximately 89% of modern networks are based on his original design.",
+        "accuracy": "incorrect",
+        "issues": ["hallucination"],
+        "confidence": 0.88,
+        "severity": "high",
+        "llm_score": 0.2,
+        "rule_score": 0.3,
+        "final_score": 0.24,
+        "latency_ms": 980,
+    },
+    {
+        "prompt": "Explain the differences between TCP and UDP protocols, including use cases, advantages, and disadvantages.",
+        "response": "TCP is reliable.",
+        "accuracy": "incorrect",
+        "issues": ["incomplete"],
+        "confidence": 0.92,
+        "severity": "high",
+        "llm_score": 0.15,
+        "rule_score": 0.45,
+        "final_score": 0.27,
+        "latency_ms": 870,
+    },
+    {
+        "prompt": "Is coffee healthy?",
+        "response": "Coffee is always good for your health and increases lifespan. However, coffee is never good for your health and decreases lifespan significantly.",
+        "accuracy": "incorrect",
+        "issues": ["contradiction"],
+        "confidence": 0.85,
+        "severity": "high",
+        "llm_score": 0.1,
+        "rule_score": 0.4,
+        "final_score": 0.22,
+        "latency_ms": 1100,
+    },
+    {
+        "prompt": "What is photosynthesis?",
+        "response": "Photosynthesis is the process by which green plants and some other organisms use sunlight to synthesize foods from carbon dioxide and water. It generally involves the green pigment chlorophyll and generates oxygen as a byproduct.",
+        "accuracy": "correct",
+        "issues": [],
+        "confidence": 0.97,
+        "severity": "low",
+        "llm_score": 0.98,
+        "rule_score": 1.0,
+        "final_score": 0.988,
+        "latency_ms": 1350,
+    },
+    {
+        "prompt": "How does a blockchain work?",
+        "response": "A blockchain is kind of sort of a distributed database. There are many factors involved. It depends. In some ways it is like a ledger, more or less.",
+        "accuracy": "incorrect",
+        "issues": ["vague", "incomplete"],
+        "confidence": 0.72,
+        "severity": "medium",
+        "llm_score": 0.35,
+        "rule_score": 0.5,
+        "final_score": 0.41,
+        "latency_ms": 920,
+    },
+    {
+        "prompt": "What are the benefits of regular exercise?",
+        "response": "Regular exercise has numerous benefits including improved cardiovascular health, stronger muscles and bones, better mental health, weight management, enhanced immune function, and reduced risk of chronic diseases like type 2 diabetes and certain cancers.",
+        "accuracy": "correct",
+        "issues": [],
+        "confidence": 0.94,
+        "severity": "low",
+        "llm_score": 0.92,
+        "rule_score": 1.0,
+        "final_score": 0.952,
+        "latency_ms": 1180,
+    },
+    {
+        "prompt": "What is the speed of light?",
+        "response": "According to some studies, research suggests that approximately 67% of physicists believe the speed of light is around 300,000 km/s in a vacuum, also known as 'c'. Experts say that this is generally accepted as a universal constant.",
+        "accuracy": "correct",
+        "issues": ["hallucination"],
+        "confidence": 0.65,
+        "severity": "medium",
+        "llm_score": 0.6,
+        "rule_score": 0.55,
+        "final_score": 0.58,
+        "latency_ms": 1420,
+    },
+    {
+        "prompt": "Explain machine learning in simple terms.",
+        "response": "Machine learning is a subset of artificial intelligence where computers learn from data without being explicitly programmed. Instead of following fixed rules, ML algorithms identify patterns in training data and use those patterns to make predictions or decisions on new data. Common types include supervised learning, unsupervised learning, and reinforcement learning.",
+        "accuracy": "correct",
+        "issues": [],
+        "confidence": 0.96,
+        "severity": "low",
+        "llm_score": 0.95,
+        "rule_score": 1.0,
+        "final_score": 0.97,
+        "latency_ms": 1560,
+    },
+    {
+        "prompt": "What causes earthquakes?",
+        "response": "Earthquakes are caused by the sudden release of energy in the Earth's crust that creates seismic waves. This is usually due to tectonic plate movements along fault lines. The point of origin is called the hypocenter, and the point directly above on the surface is the epicenter.",
+        "accuracy": "correct",
+        "issues": [],
+        "confidence": 0.93,
+        "severity": "low",
+        "llm_score": 0.94,
+        "rule_score": 1.0,
+        "final_score": 0.964,
+        "latency_ms": 1290,
+    },
+    {
+        "prompt": "What is quantum computing?",
+        "response": "Quantum computing uses qubits instead of classical bits. A recent study found that approximately 42% of Fortune 500 companies are investing in quantum research. Experts believe that quantum supremacy was achieved by various organizations, and statistics show that approximately 78% of tech leaders see quantum as transformative.",
+        "accuracy": "incorrect",
+        "issues": ["hallucination", "vague"],
+        "confidence": 0.55,
+        "severity": "high",
+        "llm_score": 0.25,
+        "rule_score": 0.3,
+        "final_score": 0.27,
+        "latency_ms": 1670,
+    },
+    {
+        "prompt": "Compare Python and JavaScript.",
+        "response": "Python is always better than JavaScript. However, JavaScript is always better than Python for all use cases. Python is never used for web development while JavaScript is never used for data science.",
+        "accuracy": "incorrect",
+        "issues": ["contradiction", "hallucination"],
+        "confidence": 0.82,
+        "severity": "high",
+        "llm_score": 0.1,
+        "rule_score": 0.2,
+        "final_score": 0.14,
+        "latency_ms": 1050,
+    },
+    {
+        "prompt": "What is the theory of relativity?",
+        "response": "Einstein's theory of relativity consists of two interrelated theories: special relativity and general relativity. Special relativity deals with objects moving at constant speeds, showing that the laws of physics are the same for all non-accelerating observers and that the speed of light is constant. General relativity extends this to gravity, describing it as the curvature of spacetime caused by mass and energy.",
+        "accuracy": "correct",
+        "issues": [],
+        "confidence": 0.96,
+        "severity": "low",
+        "llm_score": 0.97,
+        "rule_score": 1.0,
+        "final_score": 0.982,
+        "latency_ms": 1880,
+    },
+    {
+        "prompt": "How do vaccines work?",
+        "response": "Vaccines work by training the immune system to recognize and fight specific pathogens. They contain weakened or inactivated forms of the pathogen, or parts of it, which stimulate the immune system to produce antibodies. This creates immunological memory, so if the body encounters the real pathogen later, it can respond quickly and effectively.",
+        "accuracy": "correct",
+        "issues": [],
+        "confidence": 0.95,
+        "severity": "low",
+        "llm_score": 0.96,
+        "rule_score": 1.0,
+        "final_score": 0.976,
+        "latency_ms": 1450,
+    },
+    {
+        "prompt": "What is dark matter?",
+        "response": "It depends. There are many factors. Dark matter is kind of sort of something in the universe.",
+        "accuracy": "incorrect",
+        "issues": ["vague", "incomplete"],
+        "confidence": 0.78,
+        "severity": "medium",
+        "llm_score": 0.2,
+        "rule_score": 0.35,
+        "final_score": 0.26,
+        "latency_ms": 780,
+    },
+    {
+        "prompt": "Explain how HTTP works.",
+        "response": "HTTP (Hypertext Transfer Protocol) is a request-response protocol for client-server communication. A client sends a request with a method (GET, POST, PUT, DELETE), headers, and optional body. The server processes the request and returns a response with a status code (200, 404, 500), headers, and body. HTTP/2 adds multiplexing and header compression for better performance.",
+        "accuracy": "correct",
+        "issues": [],
+        "confidence": 0.94,
+        "severity": "low",
+        "llm_score": 0.93,
+        "rule_score": 1.0,
+        "final_score": 0.958,
+        "latency_ms": 1320,
+    },
+    {
+        "prompt": "What is the greenhouse effect?",
+        "response": "The greenhouse effect is a natural process where certain gases in Earth's atmosphere trap heat from the sun, warming the planet's surface. Key greenhouse gases include carbon dioxide, methane, and water vapor. Without this effect, Earth would be about 33°C cooler. However, human activities have intensified this effect, contributing to global warming.",
+        "accuracy": "correct",
+        "issues": [],
+        "confidence": 0.93,
+        "severity": "low",
+        "llm_score": 0.94,
+        "rule_score": 1.0,
+        "final_score": 0.964,
+        "latency_ms": 1540,
+    },
+    {
+        "prompt": "What is CRISPR?",
+        "response": "CRISPR is a gene editing technology. As far as I know, it was maybe discovered by someone. I think it works by using some kind of molecular scissors, approximately. According to some sources, various studies have shown that it might be useful, I believe.",
+        "accuracy": "incorrect",
+        "issues": ["hallucination", "vague"],
+        "confidence": 0.6,
+        "severity": "medium",
+        "llm_score": 0.3,
+        "rule_score": 0.4,
+        "final_score": 0.34,
+        "latency_ms": 1150,
+    },
+    {
+        "prompt": "How does DNS resolution work?",
+        "response": "DNS resolution translates domain names to IP addresses. When you type a URL, your browser first checks its cache, then the OS cache, then queries a recursive DNS resolver. The resolver checks root nameservers, then TLD nameservers, then authoritative nameservers to find the IP address. The result is cached at each level with a TTL to improve performance.",
+        "accuracy": "correct",
+        "issues": [],
+        "confidence": 0.95,
+        "severity": "low",
+        "llm_score": 0.96,
+        "rule_score": 1.0,
+        "final_score": 0.976,
+        "latency_ms": 1680,
+    },
+    {
+        "prompt": "What is the difference between RAM and ROM?",
+        "response": "RAM (Random Access Memory) is volatile memory used for temporary data storage while a computer is running. ROM (Read-Only Memory) is non-volatile memory that retains data even when powered off, typically storing firmware. RAM is faster but loses data on shutdown; ROM is slower but persistent. Modern computers use several GB of RAM and ROM is found in devices like BIOS chips.",
+        "accuracy": "correct",
+        "issues": [],
+        "confidence": 0.94,
+        "severity": "low",
+        "llm_score": 0.93,
+        "rule_score": 1.0,
+        "final_score": 0.958,
+        "latency_ms": 1390,
+    },
+]
+
+
+async def seed():
+    """Insert demo evaluations into the database."""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    async with async_session() as session:
+        now = datetime.utcnow()
+        for i, data in enumerate(DEMO_DATA):
+            # Spread evaluations across the last 14 days
+            created = now - timedelta(days=random.randint(0, 13), hours=random.randint(0, 23), minutes=random.randint(0, 59))
+            
+            evaluation = Evaluation(
+                prompt=data["prompt"],
+                response=data["response"],
+                accuracy=data["accuracy"],
+                issues=json.dumps(data["issues"]),
+                confidence=data["confidence"],
+                severity=data["severity"],
+                llm_score=data["llm_score"],
+                rule_score=data["rule_score"],
+                final_score=data["final_score"],
+                latency_ms=data["latency_ms"],
+                created_at=created,
+            )
+            session.add(evaluation)
+
+        await session.commit()
+        print(f"✅ Seeded {len(DEMO_DATA)} demo evaluations across 14 days")
+
+
+if __name__ == "__main__":
+    asyncio.run(seed())
