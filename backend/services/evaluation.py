@@ -219,17 +219,16 @@ class EvaluationService:
         """Convert LLM result to a numeric score."""
         score = 1.0
 
-        if llm_result.get("accuracy") == "incorrect":
-            score -= 0.4
-        elif llm_result.get("accuracy") == "unknown":
-            score -= 0.2
+        accuracy = llm_result.get("accuracy", "unknown")
+        if accuracy in ("incorrect", "unknown"):
+            score -= 0.5  # heavy penalty for wrong/unknown answers
 
         issues = llm_result.get("issues", [])
-        score -= len(issues) * 0.1
+        score -= len(issues) * 0.15  # each issue costs 15%
 
         severity = llm_result.get("severity", "medium")
         if severity == "high":
-            score -= 0.15
+            score -= 0.2
         elif severity == "medium":
             score -= 0.05
 
@@ -243,22 +242,26 @@ class EvaluationService:
             rule_issues = set(rule_result.issues)
             all_issues = list(llm_issues | rule_issues)
 
-            # Use LLM accuracy if available, but override if rule engine found major issues
+            # Accuracy: treat 'unknown' as 'incorrect' if there are any issues
             accuracy = llm_result.get("accuracy", "unknown")
+            if accuracy == "unknown":
+                accuracy = "incorrect" if len(all_issues) > 0 else "correct"
             if rule_result.rule_score < 0.3:
                 accuracy = "incorrect"
 
-            # Use LLM confidence, adjusted by rule score
+            # Confidence from LLM, reduced if rule engine found problems
             confidence = llm_result.get("confidence", 0.5)
             if rule_result.rule_score < 0.5:
                 confidence = min(confidence, rule_result.rule_score)
+            if accuracy == "incorrect" and confidence > 0.5:
+                confidence = max(0.1, confidence * 0.5)  # reduce overconfidence on wrong answers
 
-            # Severity: take the worst
+            # Severity: worst of both
             llm_severity = llm_result.get("severity", "medium")
-            severity = self._worst_severity(
-                llm_severity,
-                "high" if rule_result.rule_score < 0.3 else "medium" if rule_result.rule_score < 0.6 else "low"
-            )
+            rule_severity = "high" if rule_result.rule_score < 0.3 else "medium" if rule_result.rule_score < 0.6 else "low"
+            severity = self._worst_severity(llm_severity, rule_severity)
+            if accuracy == "incorrect" and severity == "low":
+                severity = "medium"  # incorrect answers should never be 'low' severity
         else:
             # Rules-only mode
             all_issues = rule_result.issues

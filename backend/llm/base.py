@@ -7,36 +7,31 @@ from typing import Dict, Any
 class LLMProvider(ABC):
     """Base class for LLM evaluation providers."""
 
-    EVALUATION_SYSTEM_PROMPT = """You are a strict AI evaluation system. Your job is to evaluate an AI model's response to a given prompt.
+    EVALUATION_SYSTEM_PROMPT = """You are a STRICT AI evaluation judge. Your ONLY job is to determine if an AI response is factually correct.
 
-You MUST respond with ONLY a valid JSON object with these exact fields:
+CRITICAL RULES:
+1. CHECK EVERY FACTUAL CLAIM. If the response says "X is Y", verify that claim. For example:
+   - "The capital of France is Paris" → CORRECT
+   - "The capital of France is Dubai" → INCORRECT (hallucination)
+   - "Einstein invented the internet" → INCORRECT (hallucination)
+2. If ANY factual claim is wrong, accuracy MUST be "incorrect"
+3. If the response contains made-up statistics, fake percentages, or invented studies, that is a "hallucination"
+4. If the response contradicts itself, that is a "contradiction"
+5. If the response barely answers the question, that is "incomplete"
+6. If the response uses filler words like "kind of", "sort of", "it depends" without substance, that is "vague"
+7. NEVER use "unknown" for accuracy. You MUST decide: "correct" or "incorrect"
+8. Be STRICT. When in doubt, mark as "incorrect"
+
+Respond with ONLY this JSON (no other text):
 {
     "accuracy": "correct" or "incorrect",
-    "issues": ["list of issues found, e.g. hallucination, irrelevant, incomplete, contradiction, vague, off-topic"],
-    "confidence": 0.0 to 1.0 (your confidence in the evaluation),
+    "issues": ["hallucination", "incomplete", "contradiction", "vague", "irrelevant", "off-topic"],
+    "confidence": 0.0 to 1.0,
     "severity": "low" or "medium" or "high",
-    "reasoning": "Brief explanation of your evaluation"
+    "reasoning": "One sentence explaining your judgment"
 }
 
-Evaluation criteria:
-1. FACTUAL CORRECTNESS: Is the response factually accurate? Does it contain made-up information?
-2. RELEVANCE: Does the response directly address the prompt?
-3. COMPLETENESS: Does the response fully answer all aspects of the prompt?
-4. REASONING QUALITY: Is the logic sound? Are there contradictions?
-
-Issue types to detect:
-- "hallucination": Response contains fabricated facts, made-up statistics, or invented references
-- "irrelevant": Response does not address the prompt
-- "incomplete": Response misses key aspects of the prompt
-- "contradiction": Response contains self-contradictory statements
-- "vague": Response is too vague or generic to be useful
-- "off-topic": Response discusses unrelated topics
-
-Rules:
-- Be strict. If unsure, lean toward "incorrect"
-- An empty issues array means the response is perfect
-- Confidence should reflect YOUR certainty in the evaluation, not the quality of the response
-- NEVER include any text outside the JSON object
+Only include applicable issues in the array. Empty array = perfect response.
 """
 
     @abstractmethod
